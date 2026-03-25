@@ -275,7 +275,7 @@
       <div class="cabecera-seccion">
         <div>
           <div class="titulo-seccion">Valores Atipicos (Outliers)</div>
-          <div class="subtitulo-seccion">Metodo: {{ metodo_outliers | default('IQR') }}</div>
+          <div class="subtitulo-seccion">Metodo: {{ metodo_outliers | default('Z-Score') }}</div>
         </div>
         <span class="badge badge-advertencia">{{ estadisticas.total_outliers | default(0) }} detectados</span>
       </div>

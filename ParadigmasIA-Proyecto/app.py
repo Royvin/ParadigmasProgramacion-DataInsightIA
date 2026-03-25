@@ -44,7 +44,7 @@ def cargar():
 
     # Leer opciones del formulario
     metodo_clustering  = request.form.get('metodo_clustering', 'kmeans')
-    metodo_outliers    = request.form.get('metodo_outliers', 'iqr')
+    metodo_outliers    = request.form.get('metodo_outliers', 'zscore')
     metodo_correlacion = request.form.get('metodo_correlacion', 'pearson')
 
     # Guardar archivos y validar que se pueden leer
@@ -120,7 +120,7 @@ def resultados():
         nombre_archivo     = session.get('nombre_archivo', '---'),
         generado_en        = session.get('generado_en', '---'),
         metodo_clustering  = session.get('metodo_clustering', 'kmeans'),
-        metodo_outliers    = session.get('metodo_outliers', 'iqr'),
+        metodo_outliers    = session.get('metodo_outliers', 'zscore'),
         metodo_correlacion = session.get('metodo_correlacion', 'pearson'),
         estadisticas       = datos['estadisticas'],
         stats_numericas    = datos['stats_numericas'],
