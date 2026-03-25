@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
 from modules.loader import cargar_archivo, obtener_info_archivo
+from modules.analyzer import analizar
 import os
 from datetime import datetime
 
@@ -43,8 +44,8 @@ def cargar():
             return redirect(url_for('inicio'))
 
     # Leer opciones del formulario
-    metodo_clustering  = request.form.get('metodo_clustering', 'kmeans')
-    metodo_outliers    = request.form.get('metodo_outliers', 'zscore')
+    metodo_clustering = request.form.get('metodo_clustering', 'kmeans')
+    metodo_outliers = request.form.get('metodo_outliers', 'zscore')
     metodo_correlacion = request.form.get('metodo_correlacion', 'pearson')
 
     # Guardar archivos y validar que se pueden leer
@@ -68,12 +69,12 @@ def cargar():
             metodo_correlacion
         )
 
-        session['resultados']         = resultados
-        session['metodo_clustering']  = metodo_clustering
-        session['metodo_outliers']    = metodo_outliers
+        session['resultados'] = resultados
+        session['metodo_clustering'] = metodo_clustering
+        session['metodo_outliers'] = metodo_outliers
         session['metodo_correlacion'] = metodo_correlacion
-        session['nombre_archivo']     = archivos[0].filename
-        session['generado_en']        = datetime.now().strftime('%d/%m/%Y %H:%M')
+        session['nombre_archivo'] = archivos[0].filename
+        session['generado_en'] = datetime.now().strftime('%d/%m/%Y %H:%M')
 
         return redirect(url_for('dashboard'))
 
@@ -92,18 +93,18 @@ def dashboard():
 
     return render_template(
         'dashboard.html',
-        nombre_archivo     = session.get('nombre_archivo', '---'),
-        metodo_clustering  = session.get('metodo_clustering', 'kmeans'),
-        metodo_outliers    = session.get('metodo_outliers', 'iqr'),
+        nombre_archivo = session.get('nombre_archivo', '---'),
+        metodo_clustering = session.get('metodo_clustering', 'kmeans'),
+        metodo_outliers = session.get('metodo_outliers', 'iqr'),
         metodo_correlacion = session.get('metodo_correlacion', 'pearson'),
-        estadisticas       = resultados['estadisticas'],
-        columnas           = resultados['columnas'],
+        estadisticas = resultados['estadisticas'],
+        columnas = resultados['columnas'],
         stats_descriptivas = resultados['stats_descriptivas'],
-        insights           = resultados['insights'],
-        graficos           = resultados['graficos'],
-        top_correlaciones  = resultados['top_correlaciones'],
-        resumen_outliers   = resultados['resumen_outliers'],
-        info_clusters      = resultados['info_clusters'],
+        insights = resultados['insights'],
+        graficos = resultados['graficos'],
+        top_correlaciones = resultados['top_correlaciones'],
+        resumen_outliers = resultados['resumen_outliers'],
+        info_clusters = resultados['info_clusters'],
     )
 
 
@@ -117,20 +118,20 @@ def resultados():
 
     return render_template(
         'results.html',
-        nombre_archivo     = session.get('nombre_archivo', '---'),
-        generado_en        = session.get('generado_en', '---'),
+        nombre_archivo = session.get('nombre_archivo', '---'),
+        generado_en  = session.get('generado_en', '---'),
         metodo_clustering  = session.get('metodo_clustering', 'kmeans'),
-        metodo_outliers    = session.get('metodo_outliers', 'zscore'),
+        metodo_outliers = session.get('metodo_outliers', 'zscore'),
         metodo_correlacion = session.get('metodo_correlacion', 'pearson'),
-        estadisticas       = datos['estadisticas'],
-        stats_numericas    = datos['stats_numericas'],
-        stats_categoricas  = datos['stats_categoricas'],
-        insights           = datos['insights'],
-        graficos           = datos['graficos'],
+        estadisticas = datos['estadisticas'],
+        stats_numericas  = datos['stats_numericas'],
+        stats_categoricas = datos['stats_categoricas'],
+        insights = datos['insights'],
+        graficos = datos['graficos'],
         top_correlaciones  = datos['top_correlaciones'],
-        filas_outliers     = datos['filas_outliers'],
-        columnas_outliers  = datos['columnas_outliers'],
-        detalle_clusters   = datos['detalle_clusters'],
+        filas_outliers = datos['filas_outliers'],
+        columnas_outliers = datos['columnas_outliers'],
+        detalle_clusters  = datos['detalle_clusters'],
     )
 
 
@@ -146,140 +147,53 @@ def exportar():
     return redirect(url_for('resultados'))
 
 
-# -------------------------------------------------------
-# Funcion temporal de analisis con datos de prueba.
-# -------------------------------------------------------
-
-def ejecutar_analisis(rutas, metodo_clustering, metodo_outliers, metodo_correlacion):
-    estadisticas = {
-        'total_filas':       1250,
-        'total_columnas':    8,
-        'pct_faltantes':     3,
-        'total_numericas':   5,
-        'total_categoricas': 3,
-        'total_outliers':    47,
-        'total_clusters':    3,
-    }
-
-    columnas = [
-        {'nombre': 'ventas',     'tipo': 'numerica',   'no_nulos': 1240, 'unicos': 980,  'completitud': 99},
-        {'nombre': 'region',     'tipo': 'categorica', 'no_nulos': 1250, 'unicos': 5,    'completitud': 100},
-        {'nombre': 'fecha',      'tipo': 'fecha',      'no_nulos': 1230, 'unicos': 365,  'completitud': 98},
-        {'nombre': 'costo',      'tipo': 'numerica',   'no_nulos': 1100, 'unicos': 750,  'completitud': 88},
-        {'nombre': 'categoria',  'tipo': 'categorica', 'no_nulos': 1250, 'unicos': 12,   'completitud': 100},
-        {'nombre': 'descuento',  'tipo': 'numerica',   'no_nulos': 900,  'unicos': 20,   'completitud': 72},
-        {'nombre': 'cliente_id', 'tipo': 'numerica',   'no_nulos': 1250, 'unicos': 800,  'completitud': 100},
-        {'nombre': 'activo',     'tipo': 'categorica', 'no_nulos': 600,  'unicos': 2,    'completitud': 48},
-    ]
-
-    stats_descriptivas = [
-        {'columna': 'ventas',     'media': '4520.3', 'mediana': '3800.0', 'desviacion': '2100.5', 'minimo': '50.0',  'maximo': '18000.0', 'asimetria': 1.4},
-        {'columna': 'costo',      'media': '2100.8', 'mediana': '1900.0', 'desviacion': '980.2',  'minimo': '20.0',  'maximo': '9500.0',  'asimetria': 0.8},
-        {'columna': 'descuento',  'media': '12.5',   'mediana': '10.0',   'desviacion': '8.3',    'minimo': '0.0',   'maximo': '50.0',    'asimetria': 0.3},
-        {'columna': 'cliente_id', 'media': '5000.1', 'mediana': '5001.0', 'desviacion': '2886.8', 'minimo': '1.0',   'maximo': '9999.0',  'asimetria': 0.0},
-    ]
-
-    stats_numericas = [
-        {'columna': 'ventas',     'conteo': 1240, 'media': '4520.3', 'mediana': '3800.0', 'desviacion': '2100.5', 'q1': '2200.0', 'q3': '6500.0', 'minimo': '50.0',  'maximo': '18000.0', 'asimetria': 1.4,  'curtosis': 2.1},
-        {'columna': 'costo',      'conteo': 1100, 'media': '2100.8', 'mediana': '1900.0', 'desviacion': '980.2',  'q1': '1200.0', 'q3': '2900.0', 'minimo': '20.0',  'maximo': '9500.0',  'asimetria': 0.8,  'curtosis': 0.5},
-        {'columna': 'descuento',  'conteo': 900,  'media': '12.5',   'mediana': '10.0',   'desviacion': '8.3',    'q1': '5.0',    'q3': '20.0',   'minimo': '0.0',   'maximo': '50.0',    'asimetria': 0.3,  'curtosis': -0.2},
-        {'columna': 'cliente_id', 'conteo': 1250, 'media': '5000.1', 'mediana': '5001.0', 'desviacion': '2886.8', 'q1': '2500.0', 'q3': '7500.0', 'minimo': '1.0',   'maximo': '9999.0',  'asimetria': 0.0,  'curtosis': -1.2},
-    ]
-
-    stats_categoricas = [
-        {'columna': 'region',    'conteo': 1250, 'unicos': 5,  'moda': 'Norte',       'frec_moda': 420, 'faltantes': 0},
-        {'columna': 'categoria', 'conteo': 1250, 'unicos': 12, 'moda': 'Electronica', 'frec_moda': 310, 'faltantes': 0},
-        {'columna': 'activo',    'conteo': 600,  'unicos': 2,  'moda': 'Si',          'frec_moda': 480, 'faltantes': 650},
-    ]
-
+def ejecutar_analisis(rutas, metodo_clustering, metodo_outliers, metodo_correlacion): 
+    df = cargar_archivo(rutas[0])
+ 
+    resultado_analisis = analizar(df)
+ 
+    estadisticas = resultado_analisis['estadisticas']
+    columnas = resultado_analisis['columnas']
+    stats_descriptivas = resultado_analisis['stats_descriptivas']
+    stats_numericas = resultado_analisis['stats_numericas']
+    stats_categoricas = resultado_analisis['stats_categoricas']
+ 
     insights = [
-        {'tipo': 'advertencia', 'icono': '⚠️', 'categoria': 'DISTRIBUCION', 'mensaje': "La variable 'ventas' presenta asimetria positiva fuerte (skew=1.4). Se recomienda aplicar transformacion logaritmica antes del modelado."},
-        {'tipo': 'peligro',     'icono': '🔴', 'categoria': 'CALIDAD',      'mensaje': "La columna 'activo' tiene solo 48% de completitud. Considerar imputacion o exclusion del analisis."},
-        {'tipo': 'info',        'icono': '🔗', 'categoria': 'CORRELACION',  'mensaje': "Existe correlacion fuerte (r=0.87) entre 'ventas' y 'costo'. A mayor costo, mayores ventas."},
-        {'tipo': 'exito',       'icono': '✅', 'categoria': 'CLUSTERING',   'mensaje': "Se detectaron 3 grupos principales. El Cluster 2 agrupa clientes con ventas superiores al promedio."},
-        {'tipo': 'advertencia', 'icono': '🔍', 'categoria': 'OUTLIERS',     'mensaje': "El 3.8% de los registros presentan valores atipicos en la columna 'ventas'."},
+        {'tipo': 'info', 'icono': '📊', 'categoria': 'ANALISIS',
+         'mensaje': 'Analisis exploratorio completado. Proximas versiones incluiran correlaciones, outliers y clustering reales.'},
     ]
-
-    top_correlaciones = [
-        {'var1': 'ventas',    'var2': 'costo',      'r': 0.87},
-        {'var1': 'ventas',    'var2': 'descuento',  'r': 0.54},
-        {'var1': 'costo',     'var2': 'descuento',  'r': 0.41},
-        {'var1': 'ventas',    'var2': 'cliente_id', 'r': 0.12},
-    ]
-
-    resumen_outliers = [
-        {'columna': 'ventas',    'cantidad': 32, 'porcentaje': 2.6},
-        {'columna': 'descuento', 'cantidad': 15, 'porcentaje': 1.2},
-    ]
-
-    filas_outliers = [
-        {'indice': 45,  'cols_afectadas': 2, 'valores': [{'valor': '18000.0', 'es_outlier': True},  {'valor': '50.0', 'es_outlier': True}]},
-        {'indice': 312, 'cols_afectadas': 1, 'valores': [{'valor': '17500.0', 'es_outlier': True},  {'valor': '12.0', 'es_outlier': False}]},
-        {'indice': 890, 'cols_afectadas': 1, 'valores': [{'valor': '50.0',    'es_outlier': False}, {'valor': '50.0', 'es_outlier': True}]},
-    ]
-
-    columnas_outliers = ['ventas', 'descuento']
-
-    info_clusters = [
-        {'id': 1, 'tamanio': 480, 'descripcion': 'Clientes con ventas bajas y descuentos minimos. Perfil de comprador ocasional.'},
-        {'id': 2, 'tamanio': 420, 'descripcion': 'Clientes con ventas medias y descuentos moderados. Segmento principal del negocio.'},
-        {'id': 3, 'tamanio': 350, 'descripcion': 'Clientes con ventas altas y descuentos elevados. Compradores frecuentes de alto valor.'},
-    ]
-
-    detalle_clusters = [
-        {
-            'id': 1, 'tamanio': 480, 'porcentaje': 38,
-            'estadisticas': [
-                {'columna': 'ventas',    'media_cluster': '1200.5', 'media_global': '4520.3'},
-                {'columna': 'costo',     'media_cluster': '800.2',  'media_global': '2100.8'},
-                {'columna': 'descuento', 'media_cluster': '5.1',    'media_global': '12.5'},
-            ]
-        },
-        {
-            'id': 2, 'tamanio': 420, 'porcentaje': 34,
-            'estadisticas': [
-                {'columna': 'ventas',    'media_cluster': '4100.0', 'media_global': '4520.3'},
-                {'columna': 'costo',     'media_cluster': '2000.5', 'media_global': '2100.8'},
-                {'columna': 'descuento', 'media_cluster': '12.8',   'media_global': '12.5'},
-            ]
-        },
-        {
-            'id': 3, 'tamanio': 350, 'porcentaje': 28,
-            'estadisticas': [
-                {'columna': 'ventas',    'media_cluster': '9800.3', 'media_global': '4520.3'},
-                {'columna': 'costo',     'media_cluster': '4200.1', 'media_global': '2100.8'},
-                {'columna': 'descuento', 'media_cluster': '28.4',   'media_global': '12.5'},
-            ]
-        },
-    ]
-
+ 
+    top_correlaciones = []
+    resumen_outliers = []
+    filas_outliers = []
+    columnas_outliers = []
+    info_clusters = []
+    detalle_clusters = []
+ 
     graficos = {
         'distribuciones': [],
-        'correlacion':    None,
-        'outliers':       None,
-        'clustering':     None,
+        'correlacion': None,
+        'outliers': None,
+        'clustering': None,
     }
-
+ 
     return {
-        'estadisticas':       estadisticas,
-        'columnas':           columnas,
+        'estadisticas': estadisticas,
+        'columnas':  columnas,
         'stats_descriptivas': stats_descriptivas,
-        'stats_numericas':    stats_numericas,
-        'stats_categoricas':  stats_categoricas,
-        'insights':           insights,
-        'graficos':           graficos,
-        'top_correlaciones':  top_correlaciones,
-        'resumen_outliers':   resumen_outliers,
-        'filas_outliers':     filas_outliers,
-        'columnas_outliers':  columnas_outliers,
-        'info_clusters':      info_clusters,
-        'detalle_clusters':   detalle_clusters,
+        'stats_numericas': stats_numericas,
+        'stats_categoricas': stats_categoricas,
+        'insights': insights,
+        'graficos': graficos,
+        'top_correlaciones': top_correlaciones,
+        'resumen_outliers': resumen_outliers,
+        'filas_outliers': filas_outliers,
+        'columnas_outliers': columnas_outliers,
+        'info_clusters': info_clusters,
+        'detalle_clusters': detalle_clusters,
     }
 
-
-# -------------------------------------------------------
 # Manejo de errores
-# -------------------------------------------------------
 
 @app.errorhandler(404)
 def pagina_no_encontrada(e):
