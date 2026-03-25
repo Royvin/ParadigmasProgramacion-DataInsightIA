@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DataInsight AI - Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-interior">
+    <a href="{{ url_for('inicio') }}" class="nav-marca">
+      <div class="nav-marca-icono">&#x2B21;</div>
+      Data<span class="acento">Insight</span> AI
+    </a>
+    <ul class="nav-enlaces">
+      <li><a href="{{ url_for('inicio') }}">Inicio</a></li>
+      <li><a href="{{ url_for('dashboard') }}" class="activo">Dashboard</a></li>
+      <li><a href="{{ url_for('resultados') }}">Resultados</a></li>
+    </ul>
+    <a href="{{ url_for('inicio') }}" class="btn btn-fantasma btn-sm">+ Nuevo</a>
+  </div>
+</nav>
+
+<div class="layout-app">
+
+  <aside class="sidebar">
+    <div class="sidebar-seccion">
+      <div class="sidebar-etiqueta">Secciones</div>
+      <ul class="sidebar-nav">
+        <li><a href="#resumen"><span class="icono-nav">&#x1F3E0;</span> Resumen</a></li>
+        <li><a href="#columnas"><span class="icono-nav">&#x1F4CB;</span> Columnas</a></li>
+        <li><a href="#estadisticas"><span class="icono-nav">&#x1F4CA;</span> Estadisticas</a></li>
+        <li><a href="#distribuciones"><span class="icono-nav">&#x1F4C8;</span> Distribuciones</a></li>
+        <li><a href="#correlacion"><span class="icono-nav">&#x1F517;</span> Correlacion</a></li>
+        <li><a href="#outliers"><span class="icono-nav">&#x1F50D;</span> Outliers</a></li>
+        <li><a href="#clustering"><span class="icono-nav">&#x1F9E9;</span> Clustering</a></li>
+      </ul>
+    </div>
+
+    <div class="sidebar-divisor"></div>
+
+    <div class="sidebar-seccion">
+      <div class="sidebar-etiqueta">Archivo</div>
+      <div style="padding: 8px 12px; border-radius: 6px; background: var(--fondo-hover);">
+        <div style="font-size: 0.8rem; color: var(--texto-primario); font-weight: 500;">
+          {{ nombre_archivo | default('Sin archivo') }}
+        </div>
+        <div style="font-size: 0.72rem; color: var(--texto-apagado); font-family: var(--fuente-mono); margin-top: 4px;">
+          {{ estadisticas.total_filas | default(0) }} filas,
+          {{ estadisticas.total_columnas | default(0) }} cols
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-divisor"></div>
+
+    <div class="sidebar-seccion">
+      <a href="{{ url_for('resultados') }}" class="btn btn-primario btn-sm ancho-completo" style="justify-content: center;">
+        Ver reporte completo
+      </a>
+    </div>
+  </aside>
+
+  <main class="contenido-principal">
+
+    <div class="cabecera-pagina">
+      <h1>Dashboard</h1>
+      <p>Analisis de <span class="texto-acento">{{ nombre_archivo | default('---') }}</span></p>
+    </div>
+
+    <!-- Resumen general -->
+    <section id="resumen">
+      <div class="cuadricula-stats">
+
+        <div class="tarjeta-stat">
+          <div class="stat-etiqueta">Total de Filas</div>
+          <div class="stat-valor acento">{{ estadisticas.total_filas | default('---') }}</div>
+          <div class="stat-sub">registros</div>
+        </div>
+
+        <div class="tarjeta-stat">
+          <div class="stat-etiqueta">Columnas</div>
+          <div class="stat-valor">{{ estadisticas.total_columnas | default('---') }}</div>
+          <div class="stat-sub">variables</div>
+        </div>
+
+        <div class="tarjeta-stat">
+          <div class="stat-etiqueta">Valores Faltantes</div>
+          {% set pct = estadisticas.pct_faltantes | default(0) %}
+          {% if pct > 10 %}
+            <div class="stat-valor peligro">{{ pct }}%</div>
+          {% elif pct > 0 %}
+            <div class="stat-valor advertencia">{{ pct }}%</div>
+          {% else %}
+            <div class="stat-valor exito">{{ pct }}%</div>
+          {% endif %}
+          <div class="stat-sub">del total</div>
+        </div>
+
+        <div class="tarjeta-stat">
+          <div class="stat-etiqueta">Var. Numericas</div>
+          <div class="stat-valor">{{ estadisticas.total_numericas | default('---') }}</div>
+          <div class="stat-sub">columnas</div>
+        </div>
+
+        <div class="tarjeta-stat">
+          <div class="stat-etiqueta">Var. Categoricas</div>
+          <div class="stat-valor">{{ estadisticas.total_categoricas | default('---') }}</div>
+          <div class="stat-sub">columnas</div>
+        </div>
+
+        <div class="tarjeta-stat">
+          <div class="stat-etiqueta">Outliers</div>
+          {% if estadisticas.total_outliers | default(0) > 0 %}
+            <div class="stat-valor advertencia">{{ estadisticas.total_outliers }}</div>
+          {% else %}
+            <div class="stat-valor exito">0</div>
+          {% endif %}
+          <div class="stat-sub">registros atipicos</div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Insights automaticos -->
+    {% if insights %}
+    <section class="mt-24">
+      <div class="cabecera-seccion">
+        <div>
+          <div class="titulo-seccion">Insights Automaticos</div>
+          <div class="subtitulo-seccion">Hallazgos clave del analisis</div>
+        </div>
+      </div>
+      {% for insight in insights %}
+      <div class="tarjeta-insight {{ insight.tipo }}">
+        <div class="insight-icono">{{ insight.icono }}</div>
+        <div>
+          <div class="insight-categoria">{{ insight.categoria }}</div>
+          <div class="insight-texto">{{ insight.mensaje }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    <!-- Vista de columnas -->
+    <section id="columnas" class="mt-32">
+      <div class="cabecera-seccion">
+        <div>
+          <div class="titulo-seccion">Vista de Columnas</div>
+          <div class="subtitulo-seccion">Tipo y calidad por variable</div>
+        </div>
+      </div>
+      <div class="envoltura-tabla">
+        <table class="tabla-datos">
+          <thead>
+            <tr>
+              <th>Columna</th>
+              <th>Tipo</th>
+              <th>No nulos</th>
+              <th>Unicos</th>
+              <th>Completitud</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for col in columnas %}
+            <tr>
+              <td><span class="texto-mono">{{ col.nombre }}</span></td>
+              <td>
+                {% if col.tipo == 'numerica' %}
+                  <span class="badge badge-acento">{{ col.tipo }}</span>
+                {% elif col.tipo == 'categorica' %}
+                  <span class="badge badge-advertencia">{{ col.tipo }}</span>
+                {% elif col.tipo == 'fecha' %}
+                  <span class="badge badge-exito">{{ col.tipo }}</span>
+                {% else %}
+                  <span class="badge badge-neutro">{{ col.tipo }}</span>
+                {% endif %}
+              </td>
+              <td class="celda-num">{{ col.no_nulos }}</td>
+              <td class="celda-num">{{ col.unicos }}</td>
+              <td style="min-width: 160px;">
+                <div class="flex gap-8" style="align-items: center;">
+                  <div class="barra-progreso" style="flex: 1;">
+                    {% if col.completitud >= 95 %}
+                      <div class="barra-relleno exito" data-ancho="{{ col.completitud }}"></div>
+                    {% elif col.completitud >= 70 %}
+                      <div class="barra-relleno advertencia" data-ancho="{{ col.completitud }}"></div>
+                    {% else %}
+                      <div class="barra-relleno peligro" data-ancho="{{ col.completitud }}"></div>
+                    {% endif %}
+                  </div>
+                  <span class="texto-mono texto-sm">{{ col.completitud }}%</span>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5">
+                <div class="estado-vacio" style="padding: 24px;">
+                  <div class="estado-vacio-titulo">No hay columnas disponibles</div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Estadisticas descriptivas -->
+    <section id="estadisticas" class="mt-32">
+      <div class="cabecera-seccion">
+        <div>
+          <div class="titulo-seccion">Estadisticas Descriptivas</div>
+          <div class="subtitulo-seccion">Variables numericas</div>
+        </div>
+      </div>
+      <div class="envoltura-tabla">
+        <table class="tabla-datos">
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>Media</th>
+              <th>Mediana</th>
+              <th>Desv. Est.</th>
+              <th>Min</th>
+              <th>Max</th>
+              <th>Asimetria</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fila in stats_descriptivas %}
+            <tr>
+              <td><span class="texto-mono">{{ fila.columna }}</span></td>
+              <td class="celda-num">{{ fila.media }}</td>
+              <td class="celda-num">{{ fila.mediana }}</td>
+              <td class="celda-num">{{ fila.desviacion }}</td>
+              <td class="celda-num">{{ fila.minimo }}</td>
+              <td class="celda-num">{{ fila.maximo }}</td>
+              <td>
+                {% if fila.asimetria | abs > 1 %}
+                  <span class="badge badge-advertencia">{{ fila.asimetria }}</span>
+                {% else %}
+                  <span class="badge badge-exito">{{ fila.asimetria }}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="7">
+                <div class="estado-vacio" style="padding: 24px;">
+                  <div class="estado-vacio-titulo">Sin variables numericas</div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Distribuciones - graficos generados por Flask -->
+    <section id="distribuciones" class="mt-32">
+      <div class="cabecera-seccion">
+        <div>
+          <div class="titulo-seccion">Distribuciones</div>
+          <div class="subtitulo-seccion">Histogramas y diagramas de caja</div>
+        </div>
+      </div>
+      {% if graficos.distribuciones %}
+        {% for grafico in graficos.distribuciones %}
+        <div class="tarjeta" style="margin-bottom: 20px; padding: 16px;">
+          {{ grafico | safe }}
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="estado-vacio">
+          <div class="estado-vacio-icono">&#x1F4C8;</div>
+          <div class="estado-vacio-titulo">Sin graficos disponibles</div>
+        </div>
+      {% endif %}
+    </section>
+
+    <!-- Correlacion -->
+    <section id="correlacion" class="mt-32">
+      <div class="cabecera-seccion">
+        <div>
+          <div class="titulo-seccion">Matriz de Correlacion</div>
+          <div class="subtitulo-seccion">Metodo: {{ metodo_correlacion | default('Pearson') }}</div>
+        </div>
+      </div>
+
+      {% if graficos.correlacion %}
+        <div class="tarjeta" style="padding: 16px;">
+          {{ graficos.correlacion | safe }}
+        </div>
+      {% else %}
+        <div class="estado-vacio">
+          <div class="estado-vacio-icono">&#x1F517;</div>
+          <div class="estado-vacio-titulo">Sin datos de correlacion</div>
+        </div>
+      {% endif %}
+
+      {% if top_correlaciones %}
+      <div class="tarjeta mt-16">
+        <div class="tarjeta-cabecera">
+          <span class="tarjeta-titulo">Pares con mayor correlacion</span>
+        </div>
+        <div class="envoltura-tabla" style="border: none;">
+          <table class="tabla-datos">
+            <thead>
+              <tr>
+                <th>Variable 1</th>
+                <th>Variable 2</th>
+                <th>Coeficiente r</th>
+                <th>Fuerza</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for par in top_correlaciones %}
+              <tr>
+                <td class="texto-mono">{{ par.var1 }}</td>
+                <td class="texto-mono">{{ par.var2 }}</td>
+                <td class="celda-num">{{ par.r }}</td>
+                <td>
+                  {% set r_abs = par.r | abs %}
+                  {% if r_abs > 0.7 %}
+                    <span class="badge badge-exito">Fuerte</span>
+                  {% elif r_abs > 0.4 %}
+                    <span class="badge badge-advertencia">Moderada</span>
+                  {% else %}
+                    <span class="badge badge-neutro">Debil</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Outliers -->
+    <section id="outliers" class="mt-32">
+      <div class="cabecera-seccion">
+        <div>
+          <div class="titulo-seccion">Valores Atipicos (Outliers)</div>
+          <div class="subtitulo-seccion">Metodo: {{ metodo_outliers | default('IQR') }}</div>
+        </div>
+        <span class="badge badge-advertencia">
+          {{ estadisticas.total_outliers | default(0) }} detectados
+        </span>
+      </div>
+
+      {% if graficos.outliers %}
+        <div class="tarjeta" style="padding: 16px; margin-bottom: 20px;">
+          {{ graficos.outliers | safe }}
+        </div>
+      {% endif %}
+
+      {% if resumen_outliers %}
+      <div class="tarjeta">
+        <div class="tarjeta-cabecera">
+          <span class="tarjeta-titulo">Resumen por columna</span>
+        </div>
+        {% for fila in resumen_outliers %}
+        <div class="flex-entre" style="margin-bottom: 14px;">
+          <span class="texto-mono texto-sm" style="min-width: 120px;">{{ fila.columna }}</span>
+          <div class="flex gap-8" style="align-items: center; flex: 1; margin-left: 16px;">
+            {% set ancho_outlier = fila.porcentaje | string + '%' %}
+          <div class="barra-progreso" style="flex: 1;">
+              <div class="barra-relleno advertencia" data-ancho="{{ fila.porcentaje }}"></div>
+            </div>
+            <span class="texto-mono texto-sm" style="min-width: 70px; text-align: right;">
+              {{ fila.cantidad }} ({{ fila.porcentaje }}%)
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="estado-vacio">
+        <div class="estado-vacio-icono">&#x2705;</div>
+        <div class="estado-vacio-titulo">Sin outliers significativos</div>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Clustering -->
+    <section id="clustering" class="mt-32" style="margin-bottom: 64px;">
+      <div class="cabecera-seccion">
+        <div>
+          <div class="titulo-seccion">Clustering</div>
+          <div class="subtitulo-seccion">Metodo: {{ metodo_clustering | default('K-Means') }}</div>
+        </div>
+        <span class="badge badge-acento">{{ estadisticas.total_clusters | default(0) }} grupos</span>
+      </div>
+
+      {% if graficos.clustering %}
+        <div class="tarjeta" style="padding: 16px; margin-bottom: 20px;">
+          {{ graficos.clustering | safe }}
+        </div>
+      {% endif %}
+
+      {% if info_clusters %}
+      <div class="cuadricula-2">
+        {% for cluster in info_clusters %}
+        <div class="tarjeta">
+          <div class="flex-entre mb-16">
+            <span class="badge badge-acento">Cluster {{ cluster.id }}</span>
+            <span class="texto-mono texto-sm texto-apagado">{{ cluster.tamanio }} registros</span>
+          </div>
+          <p style="font-size: 0.88rem;">{{ cluster.descripcion }}</p>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    </section>
+
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('.barra-relleno[data-ancho]').forEach(function(barra) {
+    barra.style.width = barra.getAttribute('data-ancho') + '%';
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DataInsight AI - Resultados</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-interior">
+    <a href="{{ url_for('inicio') }}" class="nav-marca">
+      <div class="nav-marca-icono">&#x2B21;</div>
+      Data<span class="acento">Insight</span> AI
+    </a>
+    <ul class="nav-enlaces">
+      <li><a href="{{ url_for('inicio') }}">Inicio</a></li>
+      <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+      <li><a href="{{ url_for('resultados') }}" class="activo">Resultados</a></li>
+    </ul>
+    <div class="flex gap-8">
+      <a href="{{ url_for('exportar') }}?formato=html" class="btn btn-secundario btn-sm">Exportar HTML</a>
+      <a href="{{ url_for('exportar') }}?formato=pdf" class="btn btn-primario btn-sm">Exportar PDF</a>
+    </div>
+  </div>
+</nav>
+
+<div class="layout-app">
+
+  <aside class="sidebar">
+    <div class="sidebar-seccion">
+      <div class="sidebar-etiqueta">Reporte</div>
+      <ul class="sidebar-nav">
+        <li><a href="#resumen"><span class="icono-nav">&#x1F4CB;</span> Resumen</a></li>
+        <li><a href="#numericas"><span class="icono-nav">&#x1F522;</span> Numericas</a></li>
+        <li><a href="#categoricas"><span class="icono-nav">&#x1F3F7;&#xFE0F;</span> Categoricas</a></li>
+        <li><a href="#correlacion"><span class="icono-nav">&#x1F517;</span> Correlacion</a></li>
+        <li><a href="#outliers"><span class="icono-nav">&#x1F50D;</span> Outliers</a></li>
+        <li><a href="#clustering"><span class="icono-nav">&#x1F9E9;</span> Clustering</a></li>
+        <li><a href="#insights"><span class="icono-nav">&#x1F916;</span> Insights IA</a></li>
+      </ul>
+    </div>
+
+    <div class="sidebar-divisor"></div>
+
+    <div class="sidebar-seccion">
+      <div class="sidebar-etiqueta">Exportar</div>
+      <ul class="sidebar-nav">
+        <li><a href="{{ url_for('exportar') }}?formato=html"><span class="icono-nav">&#x1F310;</span> Reporte HTML</a></li>
+        <li><a href="{{ url_for('exportar') }}?formato=pdf"><span class="icono-nav">&#x1F4C4;</span> Reporte PDF</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="contenido-principal">
+
+    <!-- Encabezado y banner -->
+    <section id="resumen">
+      <div class="cabecera-pagina">
+        <h1>Reporte de Analisis</h1>
+        <p>Generado el {{ generado_en | default('---') }}</p>
+      </div>
+
+      <div class="tarjeta tarjeta-acento" style="margin-bottom: 32px;">
+        <div class="flex gap-24" style="flex-wrap: wrap; align-items: center;">
+
+          <div>
+            <div class="stat-etiqueta">Archivo</div>
+            <div class="texto-mono" style="font-size: 0.9rem; color: var(--texto-primario);">
+              {{ nombre_archivo | default('---') }}
+            </div>
+          </div>
+
+          <div>
+            <div class="stat-etiqueta">Dimensiones</div>
+            <div class="stat-valor acento" style="font-size: 1.3rem;">
+              {{ estadisticas.total_filas | default('---') }} x {{ estadisticas.total_columnas | default('---') }}
+            </div>
+          </div>
+
+          <div>
+            <div class="stat-etiqueta">Completitud</div>
+            <div class="stat-valor exito" style="font-size: 1.3rem;">
+              {{ 100 - (estadisticas.pct_faltantes | default(0)) }}%
+            </div>
+          </div>
+
+          <div>
+            <div class="stat-etiqueta">Clusters</div>
+            <div class="stat-valor" style="font-size: 1.3rem;">
+              {{ estadisticas.total_clusters | default('---') }}
+            </div>
+          </div>
+
+          <div>
+            <div class="stat-etiqueta">Outliers</div>
+            <div class="stat-valor advertencia" style="font-size: 1.3rem;">
+              {{ estadisticas.total_outliers | default(0) }}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Variables numericas -->
+    <section id="numericas" class="mt-32">
+      <div class="cabecera-seccion">
+        <div>
+          <div class="titulo-seccion">Variables Numericas</div>
+          <div class="subtitulo-seccion">Estadisticas descriptivas completas</div>
+        </div>
+      </div>
+      <div class="envoltura-tabla">
+        <table class="tabla-datos">
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>Conteo</th>
+              <th>Media</th>
+              <th>Mediana</th>
+              <th>Desv. Est.</th>
+              <th>Q1</th>
+              <th>Q3</th>
+              <th>Min</th>
+              <th>Max</th>
+              <th>Asimetria</th>
+              <th>Curtosis</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fila in stats_numericas %}
+            <tr>
+              <td><span class="texto-mono">{{ fila.columna }}</span></td>
+              <td class="celda-num">{{ fila.conteo }}</td>
+              <td class="celda-num">{{ fila.media }}</td>
+              <td class="celda-num">{{ fila.mediana }}</td>
+              <td class="celda-num">{{ fila.desviacion }}</td>
+              <td class="celda-num">{{ fila.q1 }}</td>
+              <td class="celda-num">{{ fila.q3 }}</td>
+              <td class="celda-num">{{ fila.minimo }}</td>
+              <td class="celda-num">{{ fila.maximo }}</td>
+              <td>
+                {% if fila.asimetria | abs > 1 %}
+                  <span class="badge badge-advertencia">{{ fila.asimetria }}</span>
+                {% else %}
+                  <span class="badge badge-exito">{{ fila.asimetria }}</span>
+                {% endif %}
+              </td>
+              <td class="celda-num">{{ fila.curtosis }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="11">
+                <div class="estado-vacio" style="padding: 24px;">
+                  <div class="estado-vacio-titulo">Sin variables numericas</div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Variables categoricas -->
+    <section id="categoricas" class="mt-32">
+      <div class="cabecera-seccion">
+        <div>
+          <div class="titulo-seccion">Variables Categoricas</div>
+          <div class="subtitulo-seccion">Frecuencias y cardinalidad</div>
+        </div>
+      </div>
+      <div class="envoltura-tabla">
+        <table class="tabla-datos">
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>Conteo</th>
+              <th>Unicos</th>
+              <th>Moda</th>
+              <th>Frec. Moda</th>
+              <th>Faltantes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fila in stats_categoricas %}
+            <tr>
+              <td><span class="texto-mono">{{ fila.columna }}</span></td>
+              <td class="celda-num">{{ fila.conteo }}</td>
+              <td class="celda-num">{{ fila.unicos }}</td>
+              <td>{{ fila.moda }}</td>
+              <td class="celda-num">{{ fila.frec_moda }}</td>
+              <td>
+                {% if fila.faltantes > 0 %}
+                  <span class="badge badge-peligro">{{ fila.faltantes }}</span>
+                {% else %}
+                  <span class="badge badge-exito">0</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6">
+                <div class="estado-vacio" style="padding: 24px;">
+                  <div class="estado-vacio-titulo">Sin variables categoricas</div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Correlacion -->
+    <section id="correlacion" class="mt-32">
+      <div class="cabecera-seccion">
+        <div>
+          <div class="titulo-seccion">Analisis de Correlacion</div>
+          <div class="subtitulo-seccion">Metodo: {{ metodo_correlacion | default('Pearson') }}</div>
+        </div>
+      </div>
+
+      {% if graficos.correlacion %}
+        <div class="tarjeta" style="padding: 16px; margin-bottom: 20px;">
+          {{ graficos.correlacion | safe }}
+        </div>
+      {% endif %}
+
+      {% if top_correlaciones %}
+      <div class="tarjeta">
+        <div class="tarjeta-cabecera">
+          <span class="tarjeta-titulo">Top pares correlacionados</span>
+        </div>
+        <div class="envoltura-tabla" style="border: none;">
+          <table class="tabla-datos">
+            <thead>
+              <tr>
+                <th>Variable 1</th>
+                <th>Variable 2</th>
+                <th>r</th>
+                <th>Interpretacion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for par in top_correlaciones %}
+              <tr>
+                <td class="texto-mono">{{ par.var1 }}</td>
+                <td class="texto-mono">{{ par.var2 }}</td>
+                <td class="celda-num">{{ par.r }}</td>
+                <td>
+                  {% set r_abs = par.r | abs %}
+                  {% if r_abs > 0.7 %}
+                    <span class="badge badge-exito">Fuerte</span>
+                  {% elif r_abs > 0.4 %}
+                    <span class="badge badge-advertencia">Moderada</span>
+                  {% else %}
+                    <span class="badge badge-neutro">Debil</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Outliers -->
+    <section id="outliers" class="mt-32">
+      <div class="cabecera-seccion">
+        <div>
+          <div class="titulo-seccion">Valores Atipicos (Outliers)</div>
+          <div class="subtitulo-seccion">Metodo: {{ metodo_outliers | default('IQR') }}</div>
+        </div>
+        <span class="badge badge-advertencia">{{ estadisticas.total_outliers | default(0) }} detectados</span>
+      </div>
+
+      {% if graficos.outliers %}
+        <div class="tarjeta" style="padding: 16px; margin-bottom: 20px;">
+          {{ graficos.outliers | safe }}
+        </div>
+      {% endif %}
+
+      {% if filas_outliers %}
+      <div class="tarjeta">
+        <div class="tarjeta-cabecera">
+          <span class="tarjeta-titulo">Registros con valores atipicos</span>
+        </div>
+        <div class="envoltura-tabla" style="border: none;">
+          <table class="tabla-datos">
+            <thead>
+              <tr>
+                <th>Indice</th>
+                {% for col in columnas_outliers %}
+                <th>{{ col }}</th>
+                {% endfor %}
+                <th>Cols. afectadas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for fila in filas_outliers %}
+              <tr>
+                <td class="celda-num">{{ fila.indice }}</td>
+                {% for valor in fila.valores %}
+                  {% if valor.es_outlier %}
+                    <td style="color: var(--advertencia); font-family: var(--fuente-mono);">{{ valor.valor }}</td>
+                  {% else %}
+                    <td>{{ valor.valor }}</td>
+                  {% endif %}
+                {% endfor %}
+                <td><span class="badge badge-advertencia">{{ fila.cols_afectadas }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% else %}
+      <div class="estado-vacio">
+        <div class="estado-vacio-icono">&#x2705;</div>
+        <div class="estado-vacio-titulo">Sin registros atipicos detectados</div>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Clustering -->
+    <section id="clustering" class="mt-32">
+      <div class="cabecera-seccion">
+        <div>
+          <div class="titulo-seccion">Clustering</div>
+          <div class="subtitulo-seccion">Metodo: {{ metodo_clustering | default('K-Means') }}</div>
+        </div>
+        <span class="badge badge-acento">{{ estadisticas.total_clusters | default(0) }} grupos</span>
+      </div>
+
+      {% if graficos.clustering %}
+        <div class="tarjeta" style="padding: 16px; margin-bottom: 20px;">
+          {{ graficos.clustering | safe }}
+        </div>
+      {% endif %}
+
+      {% if detalle_clusters %}
+        {% for cluster in detalle_clusters %}
+        <div class="tarjeta" style="margin-bottom: 16px;">
+          <div class="flex-entre mb-16">
+            <span class="badge badge-acento" style="padding: 6px 16px;">Cluster {{ cluster.id }}</span>
+            <span class="texto-mono texto-sm texto-apagado">
+              {{ cluster.tamanio }} registros ({{ cluster.porcentaje }}%)
+            </span>
+          </div>
+          <div class="envoltura-tabla" style="border: none;">
+            <table class="tabla-datos" style="font-size: 0.82rem;">
+              <thead>
+                <tr>
+                  <th>Variable</th>
+                  <th>Media del Cluster</th>
+                  <th>Media Global</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for stat in cluster.estadisticas %}
+                <tr>
+                  <td class="texto-mono">{{ stat.columna }}</td>
+                  <td class="celda-num">{{ stat.media_cluster }}</td>
+                  <td style="font-family: var(--fuente-mono); color: var(--texto-apagado);">{{ stat.media_global }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="estado-vacio">
+          <div class="estado-vacio-icono">&#x1F9E9;</div>
+          <div class="estado-vacio-titulo">No se ejecuto clustering</div>
+        </div>
+      {% endif %}
+    </section>
+
+    <!-- Insights de IA -->
+    <section id="insights" class="mt-32" style="margin-bottom: 64px;">
+      <div class="cabecera-seccion">
+        <div>
+          <div class="titulo-seccion">Insights Automaticos de IA</div>
+          <div class="subtitulo-seccion">Hallazgos generados por el sistema</div>
+        </div>
+      </div>
+
+      {% for insight in insights %}
+      <div class="tarjeta-insight {{ insight.tipo }}">
+        <div class="insight-icono">{{ insight.icono }}</div>
+        <div>
+          <div class="insight-categoria">{{ insight.categoria }}</div>
+          <div class="insight-texto">{{ insight.mensaje }}</div>
+        </div>
+      </div>
+      {% else %}
+      <div class="estado-vacio">
+        <div class="estado-vacio-icono">&#x1F916;</div>
+        <div class="estado-vacio-titulo">Sin insights disponibles</div>
+        <p class="texto-sm mt-8"><a href="{{ url_for('inicio') }}">Cargar datos para comenzar</a></p>
+      </div>
+      {% endfor %}
+    </section>
+
+  </main>
+</div>
+
+</body>
+</html>
