@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from modules.loader import cargar_archivo, obtener_info_archivo
 from modules.analyzer import analizar
 from modules.correlations import calcular_correlaciones, generar_grafico_correlacion
+from modules.outliers import detectar_outliers, generar_grafico_outliers
+from modules.analyzer import obtener_columnas_numericas
 import os
 from datetime import datetime
 import pickle
@@ -186,86 +188,106 @@ def exportar():
     flash('Exportacion no disponible aun. Proximamente.', 'info')
     return redirect(url_for('resultados'))
 
-
 def ejecutar_analisis(rutas, metodo_clustering, metodo_outliers, metodo_correlacion):
-    # Cargar el primer archivo como DataFrame
+
     df = cargar_archivo(rutas[0])
 
-    # Análisis básico (estadísticas, tipos de columnas, etc.)
     resultado_analisis = analizar(df)
-
-    estadisticas = resultado_analisis['estadisticas']
-    columnas = resultado_analisis['columnas']
+    estadisticas       = resultado_analisis['estadisticas']
+    columnas           = resultado_analisis['columnas']
     stats_descriptivas = resultado_analisis['stats_descriptivas']
-    stats_numericas = resultado_analisis['stats_numericas']
-    stats_categoricas = resultado_analisis['stats_categoricas']
-    
-    corr_data = calcular_correlaciones(df, metodo_correlacion)
-    top_correlaciones = corr_data['top_pares'][:5]   # Top 5 pares con mayor |r|
-    grafico_corr = generar_grafico_correlacion(corr_data['matriz'], metodo_correlacion)
+    stats_numericas    = resultado_analisis['stats_numericas']
+    stats_categoricas  = resultado_analisis['stats_categoricas']
+
+    #Correlaciones
+    corr_data         = calcular_correlaciones(df, metodo_correlacion)
+    top_correlaciones = corr_data['top_pares'][:5]
+    grafico_corr      = generar_grafico_correlacion(corr_data['matriz'], metodo_correlacion)
+
+    #Outliers
+    cols_numericas   = obtener_columnas_numericas(df)
+    resultado_outliers = detectar_outliers(df, cols_numericas)
+
+    resumen_outliers   = resultado_outliers['resumen_outliers']
+    filas_outliers     = resultado_outliers['filas_outliers']
+    columnas_outliers  = resultado_outliers['columnas_outliers']
+    total_outliers     = resultado_outliers['total_outliers']
+    mascara_outliers   = resultado_outliers['mascara']
+
+    grafico_outliers = generar_grafico_outliers(
+        df, mascara_outliers, columnas_outliers
+    )
 
     insights = []
+
     if top_correlaciones:
-        par_fuerte = top_correlaciones[0]
-        r_abs = abs(par_fuerte['r'])
+        par = top_correlaciones[0]
+        r_abs = abs(par['r'])
         if r_abs > 0.7:
-            mensaje = f"Correlación muy fuerte ({r_abs:.2f}) entre '{par_fuerte['var1']}' y '{par_fuerte['var2']}'. Esto sugiere una relación lineal importante."
+            msg = f"Correlacion muy fuerte ({r_abs:.2f}) entre '{par['var1']}' y '{par['var2']}'."
+            tipo = 'info'
         elif r_abs > 0.4:
-            mensaje = f"Correlación moderada ({r_abs:.2f}) entre '{par_fuerte['var1']}' y '{par_fuerte['var2']}'."
+            msg = f"Correlacion moderada ({r_abs:.2f}) entre '{par['var1']}' y '{par['var2']}'."
+            tipo = 'info'
         else:
-            mensaje = f"La correlación más alta es {r_abs:.2f} entre '{par_fuerte['var1']}' y '{par_fuerte['var2']}', indicando una relación débil."
+            msg = f"No se detectaron correlaciones fuertes. La mas alta es {r_abs:.2f}."
+            tipo = 'advertencia'
+        insights.append({'tipo': tipo, 'icono': '📈', 'categoria': 'CORRELACION', 'mensaje': msg})
+    else:
         insights.append({
-            'tipo': 'info',
-            'icono': '📈',
-            'categoria': 'CORRELACIÓN',
-            'mensaje': mensaje
+            'tipo': 'advertencia', 'icono': '⚠️', 'categoria': 'CORRELACION',
+            'mensaje': 'No hay suficientes columnas numericas para calcular correlaciones.'
+        })
+
+    # Insight de outliers
+    if total_outliers > 0:
+        pct = round((total_outliers / estadisticas['total_filas']) * 100, 1)
+        col_mas = resumen_outliers[0]['columna'] if resumen_outliers else '---'
+        tipo_out = 'peligro' if pct > 5 else 'advertencia'
+        insights.append({
+            'tipo': tipo_out, 'icono': '🔍', 'categoria': 'OUTLIERS',
+            'mensaje': f"Se detectaron {total_outliers} registros atipicos ({pct}% del total). La columna con mas outliers es '{col_mas}'."
         })
     else:
         insights.append({
-            'tipo': 'advertencia',
-            'icono': '⚠️',
-            'categoria': 'CORRELACIÓN',
-            'mensaje': 'No hay suficientes columnas numéricas para calcular correlaciones (se necesitan al menos 2).'
+            'tipo': 'exito', 'icono': '✅', 'categoria': 'OUTLIERS',
+            'mensaje': 'No se detectaron valores atipicos significativos en el dataset.'
         })
 
-    # Insight general del análisis
+    # Insight general
     insights.append({
-        'tipo': 'info',
-        'icono': '📊',
-        'categoria': 'ANÁLISIS',
-        'mensaje': f"Análisis exploratorio completado. Se encontraron {len(columnas)} columnas y {estadisticas['total_filas']} filas."
+        'tipo': 'info', 'icono': '📊', 'categoria': 'ANALISIS',
+        'mensaje': f"Dataset analizado: {estadisticas['total_filas']} filas, {estadisticas['total_columnas']} columnas, {estadisticas['total_numericas']} variables numericas."
     })
 
-    resumen_outliers = []
-    filas_outliers = []
-    columnas_outliers = []
-    info_clusters = []
+    #Clustering (pendiente)
+    info_clusters    = []
     detalle_clusters = []
 
-    graficos = {
-        'distribuciones': [],   # Histogramas, boxplots (pendiente)
-        'correlacion': grafico_corr,
-        'outliers': None,
-        'clustering': None,
-    }
-
-    estadisticas['total_outliers'] = 0
+    estadisticas['total_outliers'] = total_outliers
     estadisticas['total_clusters'] = 0
 
+    graficos = {
+        'distribuciones': [],
+        'correlacion':    grafico_corr,
+        'outliers':       grafico_outliers,
+        'clustering':     None,
+    }
+
     return {
-        'estadisticas': estadisticas,
-        'columnas': columnas,
+        'estadisticas':       estadisticas,
+        'columnas':           columnas,
         'stats_descriptivas': stats_descriptivas,
-        'stats_numericas': stats_numericas,
-        'stats_categoricas': stats_categoricas,
-        'insights': insights,
-        'graficos': graficos,
-        'top_correlaciones': top_correlaciones,
-        'resumen_outliers': resumen_outliers,
-        'filas_outliers': filas_outliers,
-        'columnas_outliers': columnas_outliers,
-        'info_clusters': info_clusters,
-        'detalle_clusters': detalle_clusters,
+        'stats_numericas':    stats_numericas,
+        'stats_categoricas':  stats_categoricas,
+        'insights':           insights,
+        'graficos':           graficos,
+        'top_correlaciones':  top_correlaciones,
+        'resumen_outliers':   resumen_outliers,
+        'filas_outliers':     filas_outliers,
+        'columnas_outliers':  columnas_outliers,
+        'info_clusters':      info_clusters,
+        'detalle_clusters':   detalle_clusters,
     }
 
 @app.errorhandler(404)
