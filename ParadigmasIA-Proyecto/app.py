@@ -4,6 +4,7 @@ from modules.analyzer import analizar
 from modules.correlations import calcular_correlaciones, generar_grafico_correlacion
 from modules.outliers import detectar_outliers, generar_grafico_outliers
 from modules.analyzer import obtener_columnas_numericas
+from modules.clustering import aplicar_clustering, generar_grafico_clusters, obtener_info_clusters
 import os
 from datetime import datetime
 import pickle
@@ -260,18 +261,42 @@ def ejecutar_analisis(rutas, metodo_clustering, metodo_outliers, metodo_correlac
         'mensaje': f"Dataset analizado: {estadisticas['total_filas']} filas, {estadisticas['total_columnas']} columnas, {estadisticas['total_numericas']} variables numericas."
     })
 
-    #Clustering (pendiente)
-    info_clusters    = []
-    detalle_clusters = []
+    #Clustering 
+    # Usar las mismas columnas numéricas que ya tenemos
+    labels, n_clusters, centroides, silhouette = aplicar_clustering(df, cols_numericas)
+    
+    if labels is not None and n_clusters > 0:
+        grafico_clusters = generar_grafico_clusters(df, labels, cols_numericas)
+        info_clusters, detalle_clusters = obtener_info_clusters(df, labels, centroides, cols_numericas)
+        estadisticas['total_clusters'] = n_clusters
+        
+        # Insight de clustering
+        insights.append({
+            'tipo': 'info',
+            'icono': '🧩',
+            'categoria': 'CLUSTERING',
+            'mensaje': f"Se detectaron {n_clusters} agrupaciones principales en los datos. "
+                       f"El grupo más grande contiene {max([c['tamanio'] for c in info_clusters])} registros."
+        })
+    else:
+        grafico_clusters = None
+        info_clusters = []
+        detalle_clusters = []
+        estadisticas['total_clusters'] = 0
+        insights.append({
+            'tipo': 'advertencia',
+            'icono': '⚠️',
+            'categoria': 'CLUSTERING',
+            'mensaje': 'No fue posible realizar clustering (faltan columnas numéricas o hay muy pocos datos).'
+        })
 
     estadisticas['total_outliers'] = total_outliers
-    estadisticas['total_clusters'] = 0
 
     graficos = {
         'distribuciones': [],
         'correlacion':    grafico_corr,
         'outliers':       grafico_outliers,
-        'clustering':     None,
+        'clustering':     grafico_clusters,
     }
 
     return {
