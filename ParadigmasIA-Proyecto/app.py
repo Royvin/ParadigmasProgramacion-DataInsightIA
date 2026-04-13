@@ -5,14 +5,12 @@ from modules.correlations import calcular_correlaciones, generar_grafico_correla
 from modules.outliers import detectar_outliers, generar_grafico_outliers
 from modules.analyzer import obtener_columnas_numericas
 from modules.clustering import aplicar_clustering, generar_grafico_clusters, obtener_info_clusters
+from modules.exporter import generar_pdf
 import os
 from datetime import datetime
 import pickle
 import uuid
 import time
-import openpyxl  
-from openpyxl.styles import Font, PatternFill, Alignment  
-import tempfile 
 
 app = Flask(__name__)
 
@@ -177,299 +175,42 @@ def resultados():
 
 @app.route('/exportar')
 def exportar():
-    from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib import colors
-    from reportlab.lib.units import inch, cm
-    import tempfile
-    
     nombre_res = session.get('resultados_file')
     if not nombre_res:
         flash('No hay datos para exportar.', 'error')
         return redirect(url_for('inicio'))
-    
+
     ruta_res = os.path.join(CARPETA_SUBIDAS, nombre_res)
     if not os.path.exists(ruta_res):
         flash('Los resultados expiraron. Carga el archivo nuevamente.', 'error')
         return redirect(url_for('inicio'))
-    
-    pdf_path = None
+
     try:
-        #Cargar resultados completos
         datos = cargar_resultados(nombre_res)
-        
-        #Crear archivo PDF temporal
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-            pdf_path = tmp_file.name
-        
-        #Crear documento PDF
-        doc = SimpleDocTemplate(pdf_path, pagesize=A4,
-                               rightMargin=72, leftMargin=72,
-                               topMargin=72, bottomMargin=72)
-        
-        styles = getSampleStyleSheet()
-        story = []
-        
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=20,
-            textColor=colors.HexColor('#2c3e50'),
-            alignment=1,
-            spaceAfter=30,
-            fontName='Helvetica-Bold'
-        )
-        
-        heading_style = ParagraphStyle(
-            'HeadingStyle',
-            parent=styles['Heading2'],
-            fontSize=14,
-            textColor=colors.HexColor('#34495e'),
-            spaceBefore=20,
-            spaceAfter=10,
-            fontName='Helvetica-Bold'
-        )
-        
-        story.append(Paragraph("DataInsight IA", title_style))
-        story.append(Spacer(1, 0.5*inch))
-        story.append(Paragraph("Reporte de Análisis de Datos", styles['Heading2']))
-        story.append(Spacer(1, 0.3*inch))
-        story.append(Paragraph(f"Archivo: {session.get('nombre_archivo', 'archivo.csv')}", styles['Normal']))
-        story.append(Paragraph(f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", styles['Normal']))
-        story.append(PageBreak())
 
-        story.append(Paragraph("1. Resumen General", heading_style))
-        story.append(Spacer(1, 0.1*inch))
-        
-        stats = datos.get('estadisticas', {})
-        
-        stats_data = [
-            ['Metrica', 'Valor'],
-            ['Total Filas', str(stats.get('total_filas', 0))],
-            ['Total Columnas', str(stats.get('total_columnas', 0))],
-            ['Variables Numericas', str(stats.get('total_numericas', 0))],
-            ['Variables Categoricas', str(stats.get('total_categoricas', 0))],
-            ['% Datos Faltantes', f"{stats.get('pct_faltantes', 0)}%"],
-            ['Outliers Detectados', str(stats.get('total_outliers', 0))],
-            ['Clusters Encontrados', str(stats.get('total_clusters', 0))]
-        ]
-        
-        stats_table = Table(stats_data, colWidths=[3*inch, 2*inch])
-        stats_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (1, 0), colors.HexColor('#3498db')),
-            ('TEXTCOLOR', (0, 0), (1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 11),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ]))
-        story.append(stats_table)
+        metodos = {
+            'clustering':  session.get('metodo_clustering',  'kmeans'),
+            'outliers':    session.get('metodo_outliers',    'zscore'),
+            'correlacion': session.get('metodo_correlacion', 'pearson'),
+        }
 
-        story.append(Spacer(1, 0.2*inch))
-        story.append(Paragraph("2. Metodos de Analisis", heading_style))
-        
-        methods_data = [
-            ['Tecnica', 'Metodo'],
-            ['Clustering', session.get('metodo_clustering', 'kmeans')],
-            ['Deteccion de Outliers', session.get('metodo_outliers', 'zscore')],
-            ['Correlacion', session.get('metodo_correlacion', 'pearson')]
-        ]
-        
-        methods_table = Table(methods_data, colWidths=[2.5*inch, 2.5*inch])
-        methods_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (1, 0), colors.HexColor('#27ae60')),
-            ('TEXTCOLOR', (0, 0), (1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ]))
-        story.append(methods_table)
-        
-        story.append(PageBreak())
-        story.append(Paragraph("3. Insights Detectados", heading_style))
-        
-        insights = datos.get('insights', [])
-        for insight in insights:
-            icono = insight.get('icono', '📊')
-            categoria = insight.get('categoria', '')
-            mensaje = insight.get('mensaje', '')
-            
-            # Texto plano sin HTML
-            texto = f"{icono} {categoria}: {mensaje}"
-            story.append(Paragraph(texto, styles['Normal']))
-            story.append(Spacer(1, 0.05*inch))
-        
-        story.append(Spacer(1, 0.2*inch))
-        story.append(Paragraph("4. Top Correlaciones", heading_style))
-        
-        correlaciones = datos.get('top_correlaciones', [])
-        if correlaciones:
-            corr_data = [['Variable 1', 'Variable 2', 'Coeficiente', 'Fuerza']]
-            for corr in correlaciones:
-                r = abs(corr.get('r', 0))
-                if r > 0.7:
-                    fuerza = "Muy fuerte"
-                elif r > 0.4:
-                    fuerza = "Moderada"
-                else:
-                    fuerza = "Debil"
-                
-                corr_data.append([
-                    corr.get('var1', ''),
-                    corr.get('var2', ''),
-                    f"{corr.get('r', 0):.3f}",
-                    fuerza
-                ])
-            
-            corr_table = Table(corr_data, colWidths=[1.8*inch, 1.8*inch, 0.8*inch, 0.8*inch])
-            corr_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498db')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ]))
-            story.append(corr_table)
-        
-        story.append(Spacer(1, 0.2*inch))
-        story.append(Paragraph("5. Deteccion de Outliers", heading_style))
-        
-        outliers = datos.get('resumen_outliers', [])
-        if outliers:
-            outlier_data = [['Columna', '# Outliers', '% Outliers', 'Impacto']]
-            for outlier in outliers:
-                pct = outlier.get('porcentaje', 0)
-                impacto = "Alto" if pct > 10 else "Medio" if pct > 5 else "Bajo"
-                outlier_data.append([
-                    outlier.get('columna', ''),
-                    str(outlier.get('total_outliers', 0)),
-                    f"{pct:.1f}%",
-                    impacto
-                ])
-            
-            outlier_table = Table(outlier_data, colWidths=[2*inch, 0.8*inch, 0.8*inch, 0.8*inch])
-            outlier_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e74c3c')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ]))
-            story.append(outlier_table)
-        
-        story.append(PageBreak())
-        story.append(Paragraph("6. Analisis de Clustering", heading_style))
-        
-        clusters = datos.get('info_clusters', [])
-        
-        #Imprimir en consola para verificar
-        print("debug clusters")
-        print(f"Clusters encontrados: {clusters}")
-        
-        if clusters:
-            cluster_data = [['Cluster', 'Tamanio', '% del Total', 'Registros']]
-            
-            for cluster in clusters:
-                cluster_id = cluster.get('cluster', '')
-                tamanio = cluster.get('tamanio', 0)
-                # Porcentaje - DEBUG
-                porcentaje = cluster.get('porcentaje', 0)
-                print(f"Cluster {cluster_id}: tamanio={tamanio}, porcentaje={porcentaje}")
-                
-                cluster_data.append([
-                    f"Cluster {cluster_id}",
-                    str(tamanio),
-                    f"{porcentaje:.1f}%",
-                    "Si" if tamanio > 0 else "No"
-                ])
-            
-            cluster_table = Table(cluster_data, colWidths=[1.5*inch, 1*inch, 1*inch, 1*inch])
-            cluster_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#9b59b6')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ]))
-            story.append(cluster_table)
-        else:
-            story.append(Paragraph("No se detectaron clusters en los datos.", styles['Normal']))
-        
-        story.append(PageBreak())
-        story.append(Paragraph("7. Estadisticas Descriptivas", heading_style))
-        
-        stats_desc = datos.get('stats_descriptivas', [])
-        if stats_desc:
-            stats_data = [['Variable', 'Media', 'Mediana', 'Desv. Estandar', 'Minimo', 'Maximo', 'Asimetria']]
-            
-            for stat in stats_desc:
-                stats_data.append([
-                    stat.get('columna', ''),
-                    str(stat.get('media', '')),
-                    str(stat.get('mediana', '')),
-                    str(stat.get('desviacion', '')),
-                    str(stat.get('minimo', '')),
-                    str(stat.get('maximo', '')),
-                    str(stat.get('asimetria', ''))
-                ])
-            
-            stats_table_desc = Table(stats_data, colWidths=[1.2*inch, 0.7*inch, 0.7*inch, 0.8*inch, 0.6*inch, 0.6*inch, 0.6*inch])
-            stats_table_desc.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498db')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('FONTSIZE', (0, 0), (-1, -1), 7),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-            story.append(stats_table_desc)
-        
-        story.append(PageBreak())
-        story.append(Paragraph("8. Informacion de Columnas", heading_style))
-        
-        columnas = datos.get('columnas', [])
-        if columnas:
-            col_data = [['Columna', 'Tipo', 'Valores No Nulos', 'Valores Unicos', 'Completitud']]
-            
-            for col in columnas:
-                col_data.append([
-                    col.get('nombre', ''),
-                    col.get('tipo', ''),
-                    str(col.get('no_nulos', '')),
-                    str(col.get('unicos', '')),
-                    f"{col.get('completitud', 0)}%"
-                ])
-            
-            col_table = Table(col_data, colWidths=[1.2*inch, 0.8*inch, 1*inch, 0.8*inch, 0.8*inch])
-            col_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#34495e')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ]))
-            story.append(col_table)
-        
-        #Construir PDF
-        doc.build(story)
-        
-        #Enviar archivo
+        ruta_pdf = generar_pdf(
+            datos=datos,
+            nombre_archivo=session.get('nombre_archivo', 'archivo'),
+            metodos=metodos,
+        )
+
+        nombre_descarga = f"reporte_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
         return send_file(
-            pdf_path,
+            ruta_pdf,
             as_attachment=True,
-            download_name=f"reporte_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-            mimetype='application/pdf'
+            download_name=nombre_descarga,
+            mimetype='application/pdf',
         )
-        
+
     except Exception as e:
         flash(f'Error al generar el PDF: {str(e)}', 'error')
-        if pdf_path and os.path.exists(pdf_path):
-            try:
-                os.remove(pdf_path)
-            except:
-                pass
         return redirect(url_for('resultados'))
 
 
