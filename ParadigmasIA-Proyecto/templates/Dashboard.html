@@ -263,28 +263,6 @@
       </div>
     </section>
 
-    <!-- Distribuciones - graficos generados por Flask -->
-    <section id="distribuciones" class="mt-32">
-      <div class="cabecera-seccion">
-        <div>
-          <div class="titulo-seccion">Distribuciones</div>
-          <div class="subtitulo-seccion">Histogramas y diagramas de caja</div>
-        </div>
-      </div>
-      {% if graficos.distribuciones %}
-        {% for grafico in graficos.distribuciones %}
-        <div class="tarjeta" style="margin-bottom: 20px; padding: 16px;">
-          {{ grafico | safe }}
-        </div>
-        {% endfor %}
-      {% else %}
-        <div class="estado-vacio">
-          <div class="estado-vacio-icono">&#x1F4C8;</div>
-          <div class="estado-vacio-titulo">Sin graficos disponibles</div>
-        </div>
-      {% endif %}
-    </section>
-
     <!-- Correlacion -->
     <section id="correlacion" class="mt-32">
       <div class="cabecera-seccion">

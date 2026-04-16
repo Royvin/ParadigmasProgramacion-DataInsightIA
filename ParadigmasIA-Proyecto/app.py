@@ -189,9 +189,9 @@ def exportar():
         datos = cargar_resultados(nombre_res)
 
         metodos = {
-            'clustering':  session.get('metodo_clustering',  'kmeans'),
-            'outliers':    session.get('metodo_outliers',    'zscore'),
-            'correlacion': session.get('metodo_correlacion', 'pearson'),
+            'clustering': session.get('metodo_clustering', 'kmeans'),
+            'outliers': session.get('metodo_outliers', 'zscore'),
+            'correlacion': session.get('metodo_correlacion','pearson'),
         }
 
         ruta_pdf = generar_pdf(
@@ -219,26 +219,26 @@ def ejecutar_analisis(rutas, metodo_clustering, metodo_outliers, metodo_correlac
     df = cargar_archivo(rutas[0])
 
     resultado_analisis = analizar(df)
-    estadisticas       = resultado_analisis['estadisticas']
-    columnas           = resultado_analisis['columnas']
+    estadisticas = resultado_analisis['estadisticas']
+    columnas = resultado_analisis['columnas']
     stats_descriptivas = resultado_analisis['stats_descriptivas']
-    stats_numericas    = resultado_analisis['stats_numericas']
-    stats_categoricas  = resultado_analisis['stats_categoricas']
+    stats_numericas = resultado_analisis['stats_numericas']
+    stats_categoricas = resultado_analisis['stats_categoricas']
 
     #Correlaciones
-    corr_data         = calcular_correlaciones(df, metodo_correlacion)
+    corr_data = calcular_correlaciones(df, metodo_correlacion)
     top_correlaciones = corr_data['top_pares'][:5]
-    grafico_corr      = generar_grafico_correlacion(corr_data['matriz'], metodo_correlacion)
+    grafico_corr = generar_grafico_correlacion(corr_data['matriz'], metodo_correlacion)
 
     #Outliers
-    cols_numericas   = obtener_columnas_numericas(df)
+    cols_numericas = obtener_columnas_numericas(df)
     resultado_outliers = detectar_outliers(df, cols_numericas)
 
-    resumen_outliers   = resultado_outliers['resumen_outliers']
-    filas_outliers     = resultado_outliers['filas_outliers']
-    columnas_outliers  = resultado_outliers['columnas_outliers']
-    total_outliers     = resultado_outliers['total_outliers']
-    mascara_outliers   = resultado_outliers['mascara']
+    resumen_outliers = resultado_outliers['resumen_outliers']
+    filas_outliers = resultado_outliers['filas_outliers']
+    columnas_outliers = resultado_outliers['columnas_outliers']
+    total_outliers = resultado_outliers['total_outliers']
+    mascara_outliers = resultado_outliers['mascara']
 
     grafico_outliers = generar_grafico_outliers(
         df, mascara_outliers, columnas_outliers
@@ -319,25 +319,25 @@ def ejecutar_analisis(rutas, metodo_clustering, metodo_outliers, metodo_correlac
 
     graficos = {
         'distribuciones': [],
-        'correlacion':    grafico_corr,
-        'outliers':       grafico_outliers,
-        'clustering':     grafico_clusters,
+        'correlacion': grafico_corr,
+        'outliers': grafico_outliers,
+        'clustering': grafico_clusters,
     }
 
     return {
-        'estadisticas':       estadisticas,
-        'columnas':           columnas,
+        'estadisticas': estadisticas,
+        'columnas': columnas,
         'stats_descriptivas': stats_descriptivas,
-        'stats_numericas':    stats_numericas,
-        'stats_categoricas':  stats_categoricas,
-        'insights':           insights,
-        'graficos':           graficos,
-        'top_correlaciones':  top_correlaciones,
-        'resumen_outliers':   resumen_outliers,
-        'filas_outliers':     filas_outliers,
-        'columnas_outliers':  columnas_outliers,
-        'info_clusters':      info_clusters,
-        'detalle_clusters':   detalle_clusters,
+        'stats_numericas': stats_numericas,
+        'stats_categoricas': stats_categoricas,
+        'insights': insights,
+        'graficos': graficos,
+        'top_correlaciones': top_correlaciones,
+        'resumen_outliers': resumen_outliers,
+        'filas_outliers': filas_outliers,
+        'columnas_outliers': columnas_outliers,
+        'info_clusters': info_clusters,
+        'detalle_clusters': detalle_clusters,
     }
 
 @app.errorhandler(404)
