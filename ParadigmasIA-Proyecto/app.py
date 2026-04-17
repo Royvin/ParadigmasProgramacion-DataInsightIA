@@ -16,12 +16,14 @@ app = Flask(__name__)
 
 app.secret_key = os.environ.get('SECRET_KEY', 'datainsight-dev-key-2024')
 
-# Carpeta donde se guardarán los archivos subidos y los resultados serializados
+app.jinja_env.filters['enumerate'] = enumerate
+
 CARPETA_SUBIDAS = os.path.join(os.path.dirname(__file__), 'subidas')
 os.makedirs(CARPETA_SUBIDAS, exist_ok=True)
 
 EXTENSIONES_PERMITIDAS = {'csv', 'xlsx', 'xls'}
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+
 
 def guardar_resultados(resultados):
     nombre_archivo = f"resultados_{uuid.uuid4().hex}.pkl"
@@ -30,51 +32,55 @@ def guardar_resultados(resultados):
         pickle.dump(resultados, f)
     return nombre_archivo
 
+
 def cargar_resultados(nombre_archivo):
     ruta = os.path.join(CARPETA_SUBIDAS, nombre_archivo)
     with open(ruta, 'rb') as f:
         return pickle.load(f)
+
 
 def limpiar_resultados_antiguos():
     ahora = time.time()
     for archivo in os.listdir(CARPETA_SUBIDAS):
         if archivo.startswith('resultados_') and archivo.endswith('.pkl'):
             ruta = os.path.join(CARPETA_SUBIDAS, archivo)
-            if os.path.getmtime(ruta) < ahora - 3600:  # 1 hora
+            if os.path.getmtime(ruta) < ahora - 3600:
                 try:
                     os.remove(ruta)
                 except:
                     pass
 
+
 def extension_permitida(nombre_archivo):
     return '.' in nombre_archivo and \
            nombre_archivo.rsplit('.', 1)[1].lower() in EXTENSIONES_PERMITIDAS
+
+
+# Rutas
 
 @app.route('/')
 def inicio():
     return render_template('index.html')
 
+
 @app.route('/cargar', methods=['POST'])
 def cargar():
     archivos = request.files.getlist('archivos')
 
-    # Validar que se hayan enviado archivos
     if not archivos or archivos[0].filename == '':
         flash('Debes seleccionar al menos un archivo.', 'error')
         return redirect(url_for('inicio'))
 
-    # Validar extensiones
     for archivo in archivos:
         if not extension_permitida(archivo.filename):
             flash(f'El archivo "{archivo.filename}" no es valido. Solo se aceptan CSV, XLSX y XLS.', 'error')
             return redirect(url_for('inicio'))
 
-    # Leer opciones del formulario (métodos de análisis)
-    metodo_clustering = request.form.get('metodo_clustering', 'kmeans')
-    metodo_outliers = request.form.get('metodo_outliers', 'zscore')
+    metodo_clustering = request.form.get('metodo_clustering',  'kmeans')
+    metodo_outliers = request.form.get('metodo_outliers',    'zscore')
     metodo_correlacion = request.form.get('metodo_correlacion', 'pearson')
 
-    # Guardar archivos físicamente y verificar que se puedan leer
+    # Guardar archivos y verificar que se puedan leer
     rutas_archivos = []
     for archivo in archivos:
         ruta = os.path.join(CARPETA_SUBIDAS, archivo.filename)
@@ -87,29 +93,35 @@ def cargar():
         rutas_archivos.append(ruta)
 
     try:
-        resultados = ejecutar_analisis(
-            rutas_archivos,
-            metodo_clustering,
-            metodo_outliers,
-            metodo_correlacion
-        )
+        # Analizar cada archivo por separado y guardar lista de resultados
+        lista_resultados = []
+        for ruta in rutas_archivos:
+            nombre = os.path.basename(ruta)
+            resultado = ejecutar_analisis(
+                ruta,
+                metodo_clustering,
+                metodo_outliers,
+                metodo_correlacion
+            )
+            resultado['nombre_archivo'] = nombre
+            lista_resultados.append(resultado)
 
-        nombre_res = guardar_resultados(resultados)
+        nombre_res = guardar_resultados(lista_resultados)
+
         session['resultados_file'] = nombre_res
         session['metodo_clustering'] = metodo_clustering
         session['metodo_outliers'] = metodo_outliers
         session['metodo_correlacion'] = metodo_correlacion
-        session['nombre_archivo'] = archivos[0].filename
         session['generado_en'] = datetime.now().strftime('%d/%m/%Y %H:%M')
-        
-        # Limpiar archivos de resultados antiguos (opcional)
-        limpiar_resultados_antiguos()
+        session['total_archivos'] = len(lista_resultados)
 
+        limpiar_resultados_antiguos()
         return redirect(url_for('dashboard'))
 
     except Exception as e:
         flash(f'Error al procesar el archivo: {str(e)}', 'error')
         return redirect(url_for('inicio'))
+
 
 @app.route('/dashboard')
 def dashboard():
@@ -117,19 +129,28 @@ def dashboard():
     if not nombre_res:
         flash('No hay datos analizados. Carga un archivo primero.', 'error')
         return redirect(url_for('inicio'))
-    
+
     ruta_res = os.path.join(CARPETA_SUBIDAS, nombre_res)
     if not os.path.exists(ruta_res):
         flash('Los resultados expiraron. Carga el archivo nuevamente.', 'error')
         return redirect(url_for('inicio'))
-    
-    resultados = cargar_resultados(nombre_res)
+
+    lista_resultados = cargar_resultados(nombre_res)
+
+    # Indice del archivo activo (por defecto el primero)
+    indice = request.args.get('archivo', 0, type=int)
+    indice = max(0, min(indice, len(lista_resultados) - 1))
+
+    resultados = lista_resultados[indice]
+
+    # Lista de nombres para el selector
+    nombres_archivos = [r['nombre_archivo'] for r in lista_resultados]
 
     return render_template(
         'dashboard.html',
-        nombre_archivo = session.get('nombre_archivo', '---'),
-        metodo_clustering = session.get('metodo_clustering', 'kmeans'),
-        metodo_outliers = session.get('metodo_outliers', 'iqr'),
+        nombre_archivo = resultados['nombre_archivo'],
+        metodo_clustering = session.get('metodo_clustering',  'kmeans'),
+        metodo_outliers = session.get('metodo_outliers',    'zscore'),
         metodo_correlacion = session.get('metodo_correlacion', 'pearson'),
         estadisticas = resultados['estadisticas'],
         columnas = resultados['columnas'],
@@ -139,7 +160,11 @@ def dashboard():
         top_correlaciones = resultados['top_correlaciones'],
         resumen_outliers = resultados['resumen_outliers'],
         info_clusters = resultados['info_clusters'],
+        # Para el selector de archivos
+        nombres_archivos = nombres_archivos,
+        indice_activo = indice,
     )
+
 
 @app.route('/resultados')
 def resultados():
@@ -147,30 +172,40 @@ def resultados():
     if not nombre_res:
         flash('No hay datos analizados. Carga un archivo primero.', 'error')
         return redirect(url_for('inicio'))
-    
+
     ruta_res = os.path.join(CARPETA_SUBIDAS, nombre_res)
     if not os.path.exists(ruta_res):
         flash('Los resultados expiraron. Carga el archivo nuevamente.', 'error')
         return redirect(url_for('inicio'))
-    
-    datos = cargar_resultados(nombre_res)
+
+    lista_resultados = cargar_resultados(nombre_res)
+
+    indice = request.args.get('archivo', 0, type=int)
+    indice = max(0, min(indice, len(lista_resultados) - 1))
+
+    datos = lista_resultados[indice]
+
+    nombres_archivos = [r['nombre_archivo'] for r in lista_resultados]
 
     return render_template(
         'results.html',
-        nombre_archivo = session.get('nombre_archivo', '---'),
-        generado_en  = session.get('generado_en', '---'),
-        metodo_clustering  = session.get('metodo_clustering', 'kmeans'),
-        metodo_outliers = session.get('metodo_outliers', 'zscore'),
+        nombre_archivo = datos['nombre_archivo'],
+        generado_en = session.get('generado_en', '---'),
+        metodo_clustering = session.get('metodo_clustering',  'kmeans'),
+        metodo_outliers = session.get('metodo_outliers',    'zscore'),
         metodo_correlacion = session.get('metodo_correlacion', 'pearson'),
         estadisticas = datos['estadisticas'],
-        stats_numericas  = datos['stats_numericas'],
+        stats_numericas = datos['stats_numericas'],
         stats_categoricas = datos['stats_categoricas'],
         insights = datos['insights'],
         graficos = datos['graficos'],
-        top_correlaciones  = datos['top_correlaciones'],
+        top_correlaciones = datos['top_correlaciones'],
         filas_outliers = datos['filas_outliers'],
         columnas_outliers = datos['columnas_outliers'],
-        detalle_clusters  = datos['detalle_clusters'],
+        detalle_clusters = datos['detalle_clusters'],
+        # Para el selector de archivos
+        nombres_archivos = nombres_archivos,
+        indice_activo = indice,
     )
 
 @app.route('/exportar')
@@ -186,17 +221,22 @@ def exportar():
         return redirect(url_for('inicio'))
 
     try:
-        datos = cargar_resultados(nombre_res)
+        lista_resultados = cargar_resultados(nombre_res)
+
+        # Exportar el archivo activo
+        indice = request.args.get('archivo', 0, type=int)
+        indice = max(0, min(indice, len(lista_resultados) - 1))
+        datos  = lista_resultados[indice]
 
         metodos = {
-            'clustering': session.get('metodo_clustering', 'kmeans'),
-            'outliers': session.get('metodo_outliers', 'zscore'),
-            'correlacion': session.get('metodo_correlacion','pearson'),
+            'clustering': session.get('metodo_clustering',  'kmeans'),
+            'outliers': session.get('metodo_outliers',    'zscore'),
+            'correlacion': session.get('metodo_correlacion', 'pearson'),
         }
 
         ruta_pdf = generar_pdf(
             datos=datos,
-            nombre_archivo=session.get('nombre_archivo', 'archivo'),
+            nombre_archivo=datos['nombre_archivo'],
             metodos=metodos,
         )
 
@@ -214,9 +254,10 @@ def exportar():
         return redirect(url_for('resultados'))
 
 
-def ejecutar_analisis(rutas, metodo_clustering, metodo_outliers, metodo_correlacion):
+#Funcion de analisis
 
-    df = cargar_archivo(rutas[0])
+def ejecutar_analisis(ruta, metodo_clustering, metodo_outliers ,metodo_correlacion):
+    df = cargar_archivo(ruta)
 
     resultado_analisis = analizar(df)
     estadisticas = resultado_analisis['estadisticas']
@@ -225,12 +266,12 @@ def ejecutar_analisis(rutas, metodo_clustering, metodo_outliers, metodo_correlac
     stats_numericas = resultado_analisis['stats_numericas']
     stats_categoricas = resultado_analisis['stats_categoricas']
 
-    #Correlaciones
+    # Correlaciones
     corr_data = calcular_correlaciones(df, metodo_correlacion)
     top_correlaciones = corr_data['top_pares'][:5]
     grafico_corr = generar_grafico_correlacion(corr_data['matriz'], metodo_correlacion)
 
-    #Outliers
+    # Outliers
     cols_numericas = obtener_columnas_numericas(df)
     resultado_outliers = detectar_outliers(df, cols_numericas)
 
@@ -240,23 +281,22 @@ def ejecutar_analisis(rutas, metodo_clustering, metodo_outliers, metodo_correlac
     total_outliers = resultado_outliers['total_outliers']
     mascara_outliers = resultado_outliers['mascara']
 
-    grafico_outliers = generar_grafico_outliers(
-        df, mascara_outliers, columnas_outliers
-    )
+    grafico_outliers = generar_grafico_outliers(df, mascara_outliers, columnas_outliers)
 
+    # Insights
     insights = []
 
     if top_correlaciones:
-        par = top_correlaciones[0]
+        par   = top_correlaciones[0]
         r_abs = abs(par['r'])
         if r_abs > 0.7:
-            msg = f"Correlacion muy fuerte ({r_abs:.2f}) entre '{par['var1']}' y '{par['var2']}'."
+            msg  = f"Correlacion muy fuerte ({r_abs:.2f}) entre '{par['var1']}' y '{par['var2']}'."
             tipo = 'info'
         elif r_abs > 0.4:
-            msg = f"Correlacion moderada ({r_abs:.2f}) entre '{par['var1']}' y '{par['var2']}'."
+            msg  = f"Correlacion moderada ({r_abs:.2f}) entre '{par['var1']}' y '{par['var2']}'."
             tipo = 'info'
         else:
-            msg = f"No se detectaron correlaciones fuertes. La mas alta es {r_abs:.2f}."
+            msg  = f"No se detectaron correlaciones fuertes. La mas alta es {r_abs:.2f}."
             tipo = 'advertencia'
         insights.append({'tipo': tipo, 'icono': '📈', 'categoria': 'CORRELACION', 'mensaje': msg})
     else:
@@ -265,9 +305,8 @@ def ejecutar_analisis(rutas, metodo_clustering, metodo_outliers, metodo_correlac
             'mensaje': 'No hay suficientes columnas numericas para calcular correlaciones.'
         })
 
-    # Insight de outliers
     if total_outliers > 0:
-        pct = round((total_outliers / estadisticas['total_filas']) * 100, 1)
+        pct     = round((total_outliers / estadisticas['total_filas']) * 100, 1)
         col_mas = resumen_outliers[0]['columna'] if resumen_outliers else '---'
         tipo_out = 'peligro' if pct > 5 else 'advertencia'
         insights.append({
@@ -280,28 +319,21 @@ def ejecutar_analisis(rutas, metodo_clustering, metodo_outliers, metodo_correlac
             'mensaje': 'No se detectaron valores atipicos significativos en el dataset.'
         })
 
-    # Insight general
     insights.append({
         'tipo': 'info', 'icono': '📊', 'categoria': 'ANALISIS',
         'mensaje': f"Dataset analizado: {estadisticas['total_filas']} filas, {estadisticas['total_columnas']} columnas, {estadisticas['total_numericas']} variables numericas."
     })
 
-    #Clustering 
-    # Usar las mismas columnas numéricas que ya tenemos
+    # Clustering
     labels, n_clusters, centroides, silhouette = aplicar_clustering(df, cols_numericas)
-    
+
     if labels is not None and n_clusters > 0:
-        grafico_clusters = generar_grafico_clusters(df, labels, cols_numericas)
+        grafico_clusters             = generar_grafico_clusters(df, labels, cols_numericas)
         info_clusters, detalle_clusters = obtener_info_clusters(df, labels, centroides, cols_numericas)
         estadisticas['total_clusters'] = n_clusters
-        
-        # Insight de clustering
         insights.append({
-            'tipo': 'info',
-            'icono': '🧩',
-            'categoria': 'CLUSTERING',
-            'mensaje': f"Se detectaron {n_clusters} agrupaciones principales en los datos. "
-                       f"El grupo más grande contiene {max([c['tamanio'] for c in info_clusters])} registros."
+            'tipo': 'info', 'icono': '🧩', 'categoria': 'CLUSTERING',
+            'mensaje': f"Se detectaron {n_clusters} agrupaciones principales. El grupo mas grande contiene {max(c['tamanio'] for c in info_clusters)} registros."
         })
     else:
         grafico_clusters = None
@@ -309,10 +341,8 @@ def ejecutar_analisis(rutas, metodo_clustering, metodo_outliers, metodo_correlac
         detalle_clusters = []
         estadisticas['total_clusters'] = 0
         insights.append({
-            'tipo': 'advertencia',
-            'icono': '⚠️',
-            'categoria': 'CLUSTERING',
-            'mensaje': 'No fue posible realizar clustering (faltan columnas numéricas o hay muy pocos datos).'
+            'tipo': 'advertencia', 'icono': '⚠️', 'categoria': 'CLUSTERING',
+            'mensaje': 'No fue posible realizar clustering (se necesitan al menos 2 columnas numericas y 10 registros).'
         })
 
     estadisticas['total_outliers'] = total_outliers
@@ -339,15 +369,18 @@ def ejecutar_analisis(rutas, metodo_clustering, metodo_outliers, metodo_correlac
         'info_clusters': info_clusters,
         'detalle_clusters': detalle_clusters,
     }
+# Manejo de errores
 
 @app.errorhandler(404)
 def pagina_no_encontrada(e):
     return render_template('index.html'), 404
 
+
 @app.errorhandler(413)
 def archivo_muy_grande(e):
     flash('El archivo supera el limite de 16 MB.', 'error')
     return redirect(url_for('inicio'))
+
 
 if __name__ == '__main__':
     app.run(debug=True)

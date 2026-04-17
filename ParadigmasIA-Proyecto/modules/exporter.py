@@ -13,13 +13,13 @@ from reportlab.lib.units import inch
 
 
 # Paleta de colores del reporte
-COLOR_PRIMARIO   = colors.HexColor('#2c3e50')
+COLOR_PRIMARIO = colors.HexColor('#2c3e50')
 COLOR_SECUNDARIO = colors.HexColor('#34495e')
-COLOR_ACENTO     = colors.HexColor('#3498db')
-COLOR_EXITO      = colors.HexColor('#27ae60')
-COLOR_ADVERTENCIA= colors.HexColor('#e67e22')
-COLOR_PELIGRO    = colors.HexColor('#e74c3c')
-COLOR_MORADO     = colors.HexColor('#9b59b6')
+COLOR_ACENTO = colors.HexColor('#3498db')
+COLOR_EXITO = colors.HexColor('#27ae60')
+COLOR_ADVERTENCIA = colors.HexColor('#e67e22')
+COLOR_PELIGRO = colors.HexColor('#e74c3c')
+COLOR_MORADO = colors.HexColor('#9b59b6')
 COLOR_FONDO_FILA = colors.HexColor('#ecf0f1')
 
 
