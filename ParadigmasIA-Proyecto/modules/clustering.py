@@ -22,7 +22,7 @@ def aplicar_clustering(df, columnas_numericas, max_clusters=8):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    # Determinar número óptimo de clusters (2..max_clusters)
+    # Determinar número óptimo de clusters
     best_k = 2
     best_score = -1
     for k in range(2, min(max_clusters, len(X))):

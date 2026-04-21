@@ -76,8 +76,8 @@ def cargar():
             flash(f'El archivo "{archivo.filename}" no es valido. Solo se aceptan CSV, XLSX y XLS.', 'error')
             return redirect(url_for('inicio'))
 
-    metodo_clustering = request.form.get('metodo_clustering',  'kmeans')
-    metodo_outliers = request.form.get('metodo_outliers',    'zscore')
+    metodo_clustering = request.form.get('metodo_clustering', 'kmeans')
+    metodo_outliers = request.form.get('metodo_outliers', 'zscore')
     metodo_correlacion = request.form.get('metodo_correlacion', 'pearson')
 
     # Guardar archivos y verificar que se puedan leer
@@ -229,8 +229,8 @@ def exportar():
         datos  = lista_resultados[indice]
 
         metodos = {
-            'clustering': session.get('metodo_clustering',  'kmeans'),
-            'outliers': session.get('metodo_outliers',    'zscore'),
+            'clustering': session.get('metodo_clustering', 'kmeans'),
+            'outliers': session.get('metodo_outliers', 'zscore'),
             'correlacion': session.get('metodo_correlacion', 'pearson'),
         }
 

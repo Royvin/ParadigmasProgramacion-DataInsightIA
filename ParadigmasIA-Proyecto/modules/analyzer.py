@@ -81,8 +81,8 @@ def _calcular_estadisticas_generales(df: pd.DataFrame, tipos: dict) -> dict:
         'pct_faltantes': pct_faltantes,
         'total_numericas': total_numericas,
         'total_categoricas': total_categoricas,
-        'total_outliers': 0,   # se rellena en outliers.py
-        'total_clusters': 0,   # se rellena en clustering.py
+        'total_outliers': 0,   
+        'total_clusters': 0,
     }
 
 def _info_columnas(df: pd.DataFrame, tipos: dict) -> list:

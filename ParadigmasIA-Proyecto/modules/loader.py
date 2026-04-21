@@ -52,7 +52,7 @@ def obtener_info_archivo(ruta: str) -> dict:
     }
 
 def _obtener_extension(ruta: str) -> str:
-    """Extrae y normaliza la extensión del archivo."""
+    "Extrae y normaliza la extensión del archivo."
     return ruta.rsplit('.', 1)[-1].lower()
 
 
